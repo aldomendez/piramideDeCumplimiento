@@ -49,7 +49,7 @@ function retrieve_from_osfm_and_put_in_sqlite(){
           item IN (
           'RX-PMQPSK-100-B3',
           'RX-PMQPSK-100-H1',
-          'RXPMQPSK100-JV2',
+          'RX-PMQPSK100-JV2',
           'RX-PMQPSK-40-D1')
           AND systemdate_est BETWEEN To_Date(To_Char(SYSDATE-2,'yyyymmdd')||'0730','yyyymmddhh24mi') AND 
           To_Date(To_Char(SYSDATE-1,'yyyymmdd')||'0730','yyyymmddhh24mi')AND OPERATION_TYPE = 'DONE'
@@ -216,8 +216,12 @@ CREATE TABLE "kpi" (
     "name" TEXT NOT NULL,
     "color" TEXT NOT NULL DEFAULT ('#FFFFFF'),
     "id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-    "Area" TEXT NOT NULL
-);
+    "Area" TEXT NOT NULL,
+    "title_offset_x" TEXT DEFAULT ('0'),
+    "title_offset_y" TEXT DEFAULT ('0'),
+    "entry_date" TEXT default datetime('now')
+)
+;
 CREATE TABLE sqlite_sequence(name,seq);
 CREATE TABLE "codes" (
     "kpiid" INTEGER NOT NULL,
@@ -239,12 +243,101 @@ CREATE TABLE "history" (
     "actual" INTEGER NOT NULL DEFAULT (0),
     "target" INTEGER NOT NULL
 );
+CREATE TABLE "main"."target_history" (
+    "kpiid" INTEGER NOT NULL,
+    "state" TEXT NOT NULL,
+    "user" TEXT NOT NULL,
+    "update_date" TEXT NOT NULL,
+    "mon" TEXT NOT NULL,
+    "tue" TEXT NOT NULL,
+    "wed" TEXT NOT NULL,
+    "thu" TEXT NOT NULL,
+    "fri" TEXT NOT NULL,
+    "sat" TEXT NOT NULL,
+    "sun" TEXT NOT NULL
+);
+
 CREATE INDEX "ids" on codes (kpiid ASC)
 CREATE INDEX "hist-kpi" on history (kpiid ASC)
 CREATE INDEX "hist-date" on history (date ASC)
 CREATE INDEX "kpi-id" on kpi (id ASC)
 CREATE INDEX "target-kpiid" on targets (kpiid ASC)
 
+CREATE TRIGGER IF NOT EXISTS 'keep_history'
+   AFTER UPDATE ON kpi
+BEGIN
+    update target_history set state = 'O'
+    where kpiid = new.kpiid;
+    insert into target_history 
+    (state,kpiid,user,update_date,mon,tue,wed,thu,fri,sat,sun)
+    values(
+    new.state,new.kpiid,new.user,datetime('now'),new.mon,
+    new.tue,new.wed,new.thu,new.fri,new.sat,new.sun);   
+END;
+
+
+
+*/
+
+/*
+CREATE TABLE sqlite_sequence(name,seq)
+CREATE TABLE "codes" (
+    "kpiid" INTEGER NOT NULL,
+    "code" TEXT NOT NULL
+)
+CREATE TABLE "targets" (
+    "kpiid" INTEGER NOT NULL,
+    "mon" INTEGER NOT NULL DEFAULT (0),
+    "tue" INTEGER NOT NULL DEFAULT (0),
+    "wed" INTEGER NOT NULL DEFAULT (0),
+    "thu" INTEGER NOT NULL DEFAULT (0),
+    "fri" INTEGER NOT NULL DEFAULT (0),
+    "sat" INTEGER NOT NULL DEFAULT (0),
+    "sun" INTEGER NOT NULL DEFAULT (0)
+)
+CREATE TABLE "history" (
+    "kpiid" INTEGER NOT NULL,
+    "date" TEXT NOT NULL,
+    "actual" INTEGER NOT NULL DEFAULT (0),
+    "target" INTEGER NOT NULL
+)
+CREATE INDEX "ids" on codes (kpiid ASC)
+CREATE INDEX "hist-kpi" on history (kpiid ASC)
+CREATE INDEX "hist-date" on history (date ASC)
+CREATE INDEX "target-kpiid" on targets (kpiid ASC)
+CREATE TABLE "kpi" (
+    "name" TEXT NOT NULL,
+    "color" TEXT NOT NULL DEFAULT ('#FFFFFF'),
+    "id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    "Area" TEXT NOT NULL,
+    "title_offset_x" TEXT DEFAULT ('0'),
+    "title_offset_y" TEXT DEFAULT ('0')
+)
+CREATE INDEX "kpi-id" on kpi (id ASC)
+CREATE TABLE "target_history" (
+    "kpiid" INTEGER NOT NULL,
+    "state" TEXT NOT NULL,
+    "user" TEXT NOT NULL,
+    "update_date" TEXT NOT NULL,
+    "mon" TEXT NOT NULL,
+    "tue" TEXT NOT NULL,
+    "wed" TEXT NOT NULL,
+    "thu" TEXT NOT NULL,
+    "fri" TEXT NOT NULL,
+    "sat" TEXT NOT NULL,
+    "sun" TEXT NOT NULL
+)
+CREATE TRIGGER 'keep_history'
+   AFTER UPDATE ON kpi
+BEGIN
+    update target_history set state = 'O'
+    where kpiid = new.kpiid;
+    insert into target_history 
+    (state,kpiid,user,update_date,mon,tue,wed,thu,fri,sat,sun)
+    values(
+    new.state,new.kpiid,new.user,datetime('now'),new.mon,
+    new.tue,new.wed,new.thu,new.fri,new.sat,new.sun);   
+END
 
 */
 
