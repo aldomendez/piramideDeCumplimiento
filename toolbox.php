@@ -91,14 +91,25 @@ function save_daily_outs(){
 }
 
 function init_tables(){
+
+/*
+* Una tabla con las areas que se quieren estar monitoreando, el target
+* Los codigos de cada area
+* y otra con los datos por dia de los outs, y la meta actual.
+*/
   $db = new PDO('sqlite:history.pyramid.sqlite');
-  $db->exec("drop table if exists dogs");
+  $db->exec("drop table if exists areas");
   $db->exec("CREATE TABLE Areas (
     Id INTEGER PRIMARY KEY,
     out_date DATETIME DEFAULT CURRENT_TIMESTAMP,
     name TEXT,
     target INTEGER);");
-  $db->exec("CREATE TABLE Areas (
+  $db->exec("CREATE TABLE codigos (
+    Id INTEGER PRIMARY KEY,
+    out_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+    name TEXT,
+    target INTEGER);");
+  $db->exec("CREATE TABLE outs (
     Id INTEGER PRIMARY KEY,
     out_date DATETIME DEFAULT CURRENT_TIMESTAMP,
     name TEXT,
@@ -194,7 +205,48 @@ $app->run();
 
 
 
+/*
 
+Inicializadores para la base de datos:
+
+Ejecutada esta secuencia se crea la base de datos requerida para
+que funcione la aplicación.
+
+CREATE TABLE "kpi" (
+    "name" TEXT NOT NULL,
+    "color" TEXT NOT NULL DEFAULT ('#FFFFFF'),
+    "id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    "Area" TEXT NOT NULL
+);
+CREATE TABLE sqlite_sequence(name,seq);
+CREATE TABLE "codes" (
+    "kpiid" INTEGER NOT NULL,
+    "code" TEXT NOT NULL
+);
+CREATE TABLE "targets" (
+    "kpiid" INTEGER NOT NULL,
+    "mon" INTEGER NOT NULL DEFAULT (0),
+    "tue" INTEGER NOT NULL DEFAULT (0),
+    "wed" INTEGER NOT NULL DEFAULT (0),
+    "thu" INTEGER NOT NULL DEFAULT (0),
+    "fri" INTEGER NOT NULL DEFAULT (0),
+    "sat" INTEGER NOT NULL DEFAULT (0),
+    "sun" INTEGER NOT NULL DEFAULT (0)
+);
+CREATE TABLE "history" (
+    "kpiid" INTEGER NOT NULL,
+    "date" TEXT NOT NULL,
+    "actual" INTEGER NOT NULL DEFAULT (0),
+    "target" INTEGER NOT NULL
+);
+CREATE INDEX "ids" on codes (kpiid ASC)
+CREATE INDEX "hist-kpi" on history (kpiid ASC)
+CREATE INDEX "hist-date" on history (date ASC)
+CREATE INDEX "kpi-id" on kpi (id ASC)
+CREATE INDEX "target-kpiid" on targets (kpiid ASC)
+
+
+*/
 
 
 
