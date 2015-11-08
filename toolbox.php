@@ -211,216 +211,7 @@ Inicializadores para la base de datos:
 
 Ejecutada esta secuencia se crea la base de datos requerida para
 que funcione la aplicación.
-
-CREATE TABLE "kpi" (
-    "name" TEXT NOT NULL,
-    "color" TEXT NOT NULL DEFAULT ('#FFFFFF'),
-    "id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-    "Area" TEXT NOT NULL,
-    "title_offset_x" TEXT DEFAULT ('0'),
-    "title_offset_y" TEXT DEFAULT ('0'),
-    "entry_date" TEXT default datetime('now')
-)
-;
-CREATE TABLE sqlite_sequence(name,seq);
-CREATE TABLE "codes" (
-    "kpiid" INTEGER NOT NULL,
-    "code" TEXT NOT NULL
-);
-CREATE TABLE "targets" (
-    "kpiid" INTEGER NOT NULL,
-    "mon" INTEGER NOT NULL DEFAULT (0),
-    "tue" INTEGER NOT NULL DEFAULT (0),
-    "wed" INTEGER NOT NULL DEFAULT (0),
-    "thu" INTEGER NOT NULL DEFAULT (0),
-    "fri" INTEGER NOT NULL DEFAULT (0),
-    "sat" INTEGER NOT NULL DEFAULT (0),
-    "sun" INTEGER NOT NULL DEFAULT (0)
-);
-CREATE TABLE "history" (
-    "kpiid" INTEGER NOT NULL,
-    "date" TEXT NOT NULL,
-    "actual" INTEGER NOT NULL DEFAULT (0),
-    "target" INTEGER NOT NULL
-);
-CREATE TABLE "main"."target_history" (
-    "kpiid" INTEGER NOT NULL,
-    "state" TEXT NOT NULL,
-    "user" TEXT NOT NULL,
-    "update_date" TEXT NOT NULL,
-    "mon" TEXT NOT NULL,
-    "tue" TEXT NOT NULL,
-    "wed" TEXT NOT NULL,
-    "thu" TEXT NOT NULL,
-    "fri" TEXT NOT NULL,
-    "sat" TEXT NOT NULL,
-    "sun" TEXT NOT NULL
-);
-
-CREATE INDEX "ids" on codes (kpiid ASC)
-CREATE INDEX "hist-kpi" on history (kpiid ASC)
-CREATE INDEX "hist-date" on history (date ASC)
-CREATE INDEX "kpi-id" on kpi (id ASC)
-CREATE INDEX "target-kpiid" on targets (kpiid ASC)
-
-CREATE TRIGGER IF NOT EXISTS 'keep_history'
-   AFTER UPDATE ON kpi
-BEGIN
-    update target_history set state = 'O'
-    where kpiid = new.kpiid;
-    insert into target_history
-    (state,kpiid,user,update_date,mon,tue,wed,thu,fri,sat,sun)
-    values(
-    new.state,new.kpiid,new.user,datetime('now'),new.mon,
-    new.tue,new.wed,new.thu,new.fri,new.sat,new.sun);
-END;
-
-
-
-*/
-
-/*
-
-Version 2.0:
-
-Los cambios de esta version se refieren a que los dias en target van a ser con
-valores numericos correspondientes al dia de la semana en la que se aplican. Un
-dia por registro.
-
-## Constraints
-
--- Describe FKD_CODES_KPIID
-CREATE TRIGGER fkd_codes_kpiid
-  BEFORE UPDATE ON kpi
-  FOR EACH ROW BEGIN
-      SELECT RAISE(ROLLBACK, 'delete on table "kpi" violates foreign key constraint "fkd_codes_kpiid"')
-      WHERE (SELECT kpiid FROM codes WHERE kpiid = new.kpiid) IS NULL;
-  END
-
-  -- Describe FKU_CODES_KPIID
-CREATE TRIGGER fku_codes_kpiid
-  BEFORE UPDATE ON codes
-  FOR EACH ROW BEGIN
-      SELECT RAISE(ROLLBACK, 'update on table "codes" violates foreign key constraint "fku_codes_kpiid"')
-      WHERE (SELECT kpiid FROM kpi WHERE kpiid = new.kpiid) IS NULL;
-  END
-
--- Describe FKI_CODES_KPIID
-CREATE TRIGGER fki_codes_kpiid
-  BEFORE INSERT ON codes
-  FOR EACH ROW BEGIN
-      SELECT RAISE(ROLLBACK, 'insert on table "codes" violates foreign key constraint "fki_codes_kpiid"')
-      WHERE  NEW.kpiid IS NOT NULL
-             AND (SELECT kpiid FROM kpi WHERE kpiid = new.kpiid) IS NULL;
-  END
-
-
-
-CREATE TRIGGER IF NOT EXISTS 'keep_history'
-   AFTER INSERT ON kpi
-BEGIN
-    update target_history set state = 'O'
-    where kpiid = new.kpiid;
-    insert into targets
-    (kpiid, dayOfWeek, target)
-              select new.kpiid, 0, 20
-    union all select new.kpiid, 1, 20
-    union all select new.kpiid, 2, 20
-    union all select new.kpiid, 3, 20
-    union all select new.kpiid, 4, 20
-    union all select new.kpiid, 5, 20
-    union all select new.kpiid, 6, 20;
-END;
-*/
-
-
-
-/*
-
-Replicate actual state
-
 PRAGMA foreign_keys = ON;
-CREATE TABLE sqlite_sequence(name,seq)
-CREATE TABLE "kpi" (
-    "name" TEXT NOT NULL,
-    "color" TEXT NOT NULL DEFAULT ('#FFFFFF'),
-    "id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-    "Area" TEXT NOT NULL,
-    "title_offset_x" TEXT DEFAULT ('0'),
-    "title_offset_y" TEXT DEFAULT ('0')
-)
-CREATE TABLE "codes" (
-    "kpiid" INTEGER NOT NULL,
-    "code" TEXT NOT NULL,
-    FOREIGN KEY(kpiid) REFERENCES kpi(id)
-)
-CREATE TABLE "targets" (
-    "kpiid" INTEGER NOT NULL,
-    "dayOfWeek" TEXT NOT NULL,
-    "target" INTEGER NOT NULL DEFAULT (0),
-    FOREIGN KEY(kpiid) REFERENCES kpi(id)
-)
-CREATE TABLE "target_history" (
-    "kpiid" INTEGER NOT NULL,
-    "state" TEXT NOT NULL,
-    "user" TEXT NOT NULL,
-    "update_date" TEXT NOT NULL,
-    "dayOfWeek" TEXT NOT NULL,
-    "target" INTEGER NOT NULL DEFAULT (0),
-    FOREIGN KEY(kpiid) REFERENCES kpi(id)
-)
-CREATE TABLE "history" (
-    "kpiid" INTEGER NOT NULL,
-    "date" TEXT NOT NULL,
-    "actual" INTEGER NOT NULL DEFAULT (0),
-    "target" INTEGER NOT NULL,
-    FOREIGN KEY(kpiid) REFERENCES kpi(id)
-)
-CREATE INDEX "codes_kpiid" on codes (kpiid ASC)
-CREATE INDEX "history_kpiid" on history (kpiid ASC)
-CREATE INDEX "kpi_id" on kpi (id ASC)
-CREATE INDEX "target_h_kpiid" on target_history (kpiid ASC)
-CREATE INDEX "target_h_state" on target_history (state ASC)
-CREATE INDEX "target_h_id_dayOfWeek" on target_history (kpiid ASC, dayOfWeek ASC)
-CREATE INDEX "history_id_date" on history (kpiid ASC, date ASC)
-CREATE INDEX "targets_id" on targets (kpiid ASC)
-CREATE TRIGGER 'keep_history'
-   AFTER INSERT ON kpi
-BEGIN
-    update target_history set state = 'O'
-    where kpiid = new.id;
-    insert into targets
-    (kpiid, dayOfWeek, target)
-              select new.id, 0, 20
-    union all select new.id, 1, 20
-    union all select new.id, 2, 20
-    union all select new.id, 3, 20
-    union all select new.id, 4, 20
-    union all select new.id, 5, 20
-    union all select new.id, 6, 20;
-END
-
-CREATE TRIGGER 'keep_history'
-   AFTER UPDATE ON targets
-BEGIN
-    update target_history set state = 'O'
-    where kpiid = new.kpiid;
-    insert into target_history
-    (kpiid, state, user update_date, dayOfWeek, target)
-              select new.kpiid, 'C', 'user', datetime('now'),new.dayOfWeek, new.target
-    union all select new.kpiid, 'C', 'user', datetime('now'),new.dayOfWeek, new.target
-    union all select new.kpiid, 'C', 'user', datetime('now'),new.dayOfWeek, new.target
-    union all select new.kpiid, 'C', 'user', datetime('now'),new.dayOfWeek, new.target
-    union all select new.kpiid, 'C', 'user', datetime('now'),new.dayOfWeek, new.target
-    union all select new.kpiid, 'C', 'user', datetime('now'),new.dayOfWeek, new.target
-    union all select new.kpiid, 'C', 'user', datetime('now'),new.dayOfWeek, new.target;
-END;
-
-
-*/
-
-
-/*
 
 CREATE TABLE "kpi" (
     "name" TEXT NOT NULL,
@@ -429,71 +220,71 @@ CREATE TABLE "kpi" (
     "Area" TEXT NOT NULL,
     "title_offset_x" TEXT DEFAULT ('0'),
     "title_offset_y" TEXT DEFAULT ('0')
-)
+);
 CREATE TABLE "target_history" (
     "kpiid" INTEGER NOT NULL,
     "state" TEXT NOT NULL,
     "user" TEXT NOT NULL,
     "update_date" TEXT NOT NULL,
-    "dayOfWeek" TEXT NOT NULL,
+    "day_of_week" TEXT NOT NULL,
     "target" INTEGER NOT NULL DEFAULT (0),
     FOREIGN KEY(kpiid) REFERENCES kpi(id)
-)
+);
 CREATE TABLE "history" (
     "kpiid" INTEGER NOT NULL,
     "date" TEXT NOT NULL,
     "actual" INTEGER NOT NULL DEFAULT (0),
     "target" INTEGER NOT NULL,
     FOREIGN KEY(kpiid) REFERENCES kpi(id)
-)
+);
 CREATE TABLE "codes" (
     "kpiid" INTEGER NOT NULL,
     "code" TEXT NOT NULL,
     FOREIGN KEY(kpiid) REFERENCES kpi(id) on update cascade on delete cascade
-)
+);
 CREATE TABLE "targets" (
     "kpiid" INTEGER NOT NULL,
-    "dayOfWeek" TEXT NOT NULL,
+    "day_of_week" TEXT NOT NULL,
+    "last_update_user" TEXT NOT NULL,
     "target" INTEGER NOT NULL DEFAULT (0),
     FOREIGN KEY(kpiid) REFERENCES kpi(id)  on update cascade on delete cascade
-)
+);
 
-CREATE INDEX "codes_kpiid" on codes (kpiid ASC)
-CREATE INDEX "history_kpiid" on history (kpiid ASC)
-CREATE INDEX "kpi_id" on kpi (id ASC)
-CREATE INDEX "target_h_kpiid" on target_history (kpiid ASC)
-CREATE INDEX "target_h_state" on target_history (state ASC)
-CREATE INDEX "target_h_id_dayOfWeek" on target_history (kpiid ASC, dayOfWeek ASC)
-CREATE INDEX "history_id_date" on history (kpiid ASC, date ASC)
-CREATE INDEX "targets_id" on targets (kpiid ASC)
+CREATE INDEX "codes_kpiid" on codes (kpiid ASC);
+CREATE INDEX "history_kpiid" on history (kpiid ASC);
+CREATE INDEX "kpi_id" on kpi (id ASC);
+CREATE INDEX "target_h_kpiid" on target_history (kpiid ASC);
+CREATE INDEX "target_h_state" on target_history (state ASC);
+CREATE INDEX "target_h_id_day_of_week" on target_history (kpiid ASC, day_of_week ASC);
+CREATE INDEX "history_id_date" on history (kpiid ASC, date ASC);
+CREATE INDEX "targets_id" on targets (kpiid ASC);
 CREATE TRIGGER 'Init_Target'
    AFTER INSERT ON kpi
 BEGIN
     insert into targets
-    (kpiid, dayOfWeek, target)
-              select new.id, 0, 0
-    union all select new.id, 1, 0
-    union all select new.id, 2, 0
-    union all select new.id, 3, 0
-    union all select new.id, 4, 0
-    union all select new.id, 5, 0
-    union all select new.id, 6, 0;
-END
+    (kpiid, day_of_week, target, last_update_user)
+              select new.id, 0, 0, 'user'
+    union all select new.id, 1, 0, 'user'
+    union all select new.id, 2, 0, 'user'
+    union all select new.id, 3, 0, 'user'
+    union all select new.id, 4, 0, 'user'
+    union all select new.id, 5, 0, 'user'
+    union all select new.id, 6, 0, 'user';
+END;
 CREATE TRIGGER 'keep_history'
    AFTER UPDATE ON targets
 BEGIN
     update target_history set state = 'O'
     where kpiid = new.kpiid;
     insert into target_history
-    (kpiid, state, user, update_date, dayOfWeek, target)
-	select new.kpiid, 'C', 'user', datetime('now'),new.dayOfWeek, new.target;
-END
+    (kpiid, state, user, update_date, day_of_week, target)
+	select new.kpiid, 'C', 'user', datetime('now'),new.day_of_week, new.target;
+END;
 CREATE TRIGGER 'i_keep_history'
    AFTER insert ON targets
 BEGIN
     insert into target_history
-    (kpiid, state, user, update_date, dayOfWeek, target)
-	select new.kpiid, 'C', 'user', datetime('now'),new.dayOfWeek, new.target;
-END
-
+    (kpiid, state, user, update_date, day_of_week, target)
+	select new.kpiid, 'C', 'user', datetime('now'),new.day_of_week, new.target;
+END;
 */
