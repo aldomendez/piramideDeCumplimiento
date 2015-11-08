@@ -8,7 +8,7 @@ La aplicacion servira para poner los datos de la piramide en una tabla de sqlite
 los datos los sacara de la base de datos haciendo querys para obtener los datos
 de outs del dia con la lista de codigos que se carguen a la aplicacion
 
-Lo que deberia de tener la aplicacion es 
+Lo que deberia de tener la aplicacion es
 
 * Una tabla con las areas que se quieren estar monitoreando, el target
 * Los codigos de cada area
@@ -37,7 +37,7 @@ function index()
 
 function retrieve_from_osfm_and_put_in_sqlite(){
     try {
-        
+
         $DB = new MxOptix();
         // global $app;
         // $body = $app->request()->getBody();
@@ -51,7 +51,7 @@ function retrieve_from_osfm_and_put_in_sqlite(){
           'RX-PMQPSK-100-H1',
           'RX-PMQPSK-100-JV2',
           'RX-PMQPSK-40-D1')
-          AND systemdate_est BETWEEN To_Date(To_Char(SYSDATE-2,'yyyymmdd')||'0730','yyyymmddhh24mi') AND 
+          AND systemdate_est BETWEEN To_Date(To_Char(SYSDATE-2,'yyyymmdd')||'0730','yyyymmddhh24mi') AND
           To_Date(To_Char(SYSDATE-1,'yyyymmdd')||'0730','yyyymmddhh24mi')AND OPERATION_TYPE = 'DONE'
         ");
         $results = null;
@@ -68,12 +68,12 @@ function retrieve_from_osfm_and_put_in_sqlite(){
 
 function save_daily_outs(){
   $db = new PDO('sqlite:history.pyramid.sqlite');
-  $db->exec("drop table if exists dogs");    
+  $db->exec("drop table if exists dogs");
   $db->exec("CREATE TABLE Dogs (
     Id INTEGER PRIMARY KEY,
     out_date DATETIME DEFAULT CURRENT_TIMESTAMP,
     Name TEXT,
-    Age INTEGER)");    
+    Age INTEGER)");
   $db->exec("INSERT INTO Dogs (Name, Age) VALUES ( 'Tank', 2);".
              "INSERT INTO Dogs (Name, Age) VALUES ( 'Glacier', 7); " .
              "INSERT INTO Dogs (Name, Age) VALUES ('Ellie', 4);");
@@ -138,7 +138,7 @@ function sqlite3_example()
     $db = new PDO('sqlite:history.pyramid.sqlite');
 
     //create the database
-    $db->exec("CREATE TABLE Dogs (Id INTEGER PRIMARY KEY, Breed TEXT, Name TEXT, Age INTEGER)");    
+    $db->exec("CREATE TABLE Dogs (Id INTEGER PRIMARY KEY, Breed TEXT, Name TEXT, Age INTEGER)");
 
     //insert some data...
     $db->exec("INSERT INTO Dogs (Breed, Name, Age) VALUES ('Labrador', 'Tank', 2);".
@@ -268,11 +268,11 @@ CREATE TRIGGER IF NOT EXISTS 'keep_history'
 BEGIN
     update target_history set state = 'O'
     where kpiid = new.kpiid;
-    insert into target_history 
+    insert into target_history
     (state,kpiid,user,update_date,mon,tue,wed,thu,fri,sat,sun)
     values(
     new.state,new.kpiid,new.user,datetime('now'),new.mon,
-    new.tue,new.wed,new.thu,new.fri,new.sat,new.sun);   
+    new.tue,new.wed,new.thu,new.fri,new.sat,new.sun);
 END;
 
 
@@ -400,20 +400,100 @@ BEGIN
     union all select new.id, 6, 20;
 END
 
+CREATE TRIGGER 'keep_history'
+   AFTER UPDATE ON targets
+BEGIN
+    update target_history set state = 'O'
+    where kpiid = new.kpiid;
+    insert into target_history
+    (kpiid, state, user update_date, dayOfWeek, target)
+              select new.kpiid, 'C', 'user', datetime('now'),new.dayOfWeek, new.target
+    union all select new.kpiid, 'C', 'user', datetime('now'),new.dayOfWeek, new.target
+    union all select new.kpiid, 'C', 'user', datetime('now'),new.dayOfWeek, new.target
+    union all select new.kpiid, 'C', 'user', datetime('now'),new.dayOfWeek, new.target
+    union all select new.kpiid, 'C', 'user', datetime('now'),new.dayOfWeek, new.target
+    union all select new.kpiid, 'C', 'user', datetime('now'),new.dayOfWeek, new.target
+    union all select new.kpiid, 'C', 'user', datetime('now'),new.dayOfWeek, new.target;
+END;
+
 
 */
 
 
+/*
 
+CREATE TABLE "kpi" (
+    "name" TEXT NOT NULL,
+    "color" TEXT NOT NULL DEFAULT ('#FFFFFF'),
+    "id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    "Area" TEXT NOT NULL,
+    "title_offset_x" TEXT DEFAULT ('0'),
+    "title_offset_y" TEXT DEFAULT ('0')
+)
+CREATE TABLE "target_history" (
+    "kpiid" INTEGER NOT NULL,
+    "state" TEXT NOT NULL,
+    "user" TEXT NOT NULL,
+    "update_date" TEXT NOT NULL,
+    "dayOfWeek" TEXT NOT NULL,
+    "target" INTEGER NOT NULL DEFAULT (0),
+    FOREIGN KEY(kpiid) REFERENCES kpi(id)
+)
+CREATE TABLE "history" (
+    "kpiid" INTEGER NOT NULL,
+    "date" TEXT NOT NULL,
+    "actual" INTEGER NOT NULL DEFAULT (0),
+    "target" INTEGER NOT NULL,
+    FOREIGN KEY(kpiid) REFERENCES kpi(id)
+)
+CREATE TABLE "codes" (
+    "kpiid" INTEGER NOT NULL,
+    "code" TEXT NOT NULL,
+    FOREIGN KEY(kpiid) REFERENCES kpi(id) on update cascade on delete cascade
+)
+CREATE TABLE "targets" (
+    "kpiid" INTEGER NOT NULL,
+    "dayOfWeek" TEXT NOT NULL,
+    "target" INTEGER NOT NULL DEFAULT (0),
+    FOREIGN KEY(kpiid) REFERENCES kpi(id)  on update cascade on delete cascade
+)
 
+CREATE INDEX "codes_kpiid" on codes (kpiid ASC)
+CREATE INDEX "history_kpiid" on history (kpiid ASC)
+CREATE INDEX "kpi_id" on kpi (id ASC)
+CREATE INDEX "target_h_kpiid" on target_history (kpiid ASC)
+CREATE INDEX "target_h_state" on target_history (state ASC)
+CREATE INDEX "target_h_id_dayOfWeek" on target_history (kpiid ASC, dayOfWeek ASC)
+CREATE INDEX "history_id_date" on history (kpiid ASC, date ASC)
+CREATE INDEX "targets_id" on targets (kpiid ASC)
+CREATE TRIGGER 'Init_Target'
+   AFTER INSERT ON kpi
+BEGIN
+    insert into targets
+    (kpiid, dayOfWeek, target)
+              select new.id, 0, 0
+    union all select new.id, 1, 0
+    union all select new.id, 2, 0
+    union all select new.id, 3, 0
+    union all select new.id, 4, 0
+    union all select new.id, 5, 0
+    union all select new.id, 6, 0;
+END
+CREATE TRIGGER 'keep_history'
+   AFTER UPDATE ON targets
+BEGIN
+    update target_history set state = 'O'
+    where kpiid = new.kpiid;
+    insert into target_history
+    (kpiid, state, user, update_date, dayOfWeek, target)
+	select new.kpiid, 'C', 'user', datetime('now'),new.dayOfWeek, new.target;
+END
+CREATE TRIGGER 'i_keep_history'
+   AFTER insert ON targets
+BEGIN
+    insert into target_history
+    (kpiid, state, user, update_date, dayOfWeek, target)
+	select new.kpiid, 'C', 'user', datetime('now'),new.dayOfWeek, new.target;
+END
 
-
-
-
-
-
-
-
-
-
-
+*/
