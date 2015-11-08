@@ -252,6 +252,12 @@ CREATE TABLE "targets" (
     "target" INTEGER NOT NULL DEFAULT (0),
     FOREIGN KEY(kpiid) REFERENCES kpi(id)  on update cascade on delete cascade
 );
+CREATE TABLE status (
+    "kpiid" TEXT NOT NULL,
+    "qty" INTEGER NOT NULL DEFAULT (0),
+    "datetime" TEXT NOT NULL,
+    FOREIGN KEY(kpiid) REFERENCES kpi(id) on update cascade on delete cascade
+);
 
 CREATE INDEX "codes_kpiid" on codes (kpiid ASC);
 CREATE INDEX "history_kpiid" on history (kpiid ASC);
