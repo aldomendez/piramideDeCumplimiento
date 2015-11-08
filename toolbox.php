@@ -221,6 +221,7 @@ CREATE TABLE "kpi" (
     "color" TEXT NOT NULL DEFAULT ('#FFFFFF'),
     "id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
     "Area" TEXT NOT NULL,
+    "type" text not null default ('OUTS'), 
     "title_offset_x" TEXT DEFAULT ('0'),
     "title_offset_y" TEXT DEFAULT ('0')
 );
@@ -238,6 +239,7 @@ CREATE TABLE "history" (
     "date" TEXT NOT NULL,
     "actual" INTEGER NOT NULL DEFAULT (0),
     "target" INTEGER NOT NULL,
+    "is_hoiday" integer not null default (0),
     FOREIGN KEY(kpiid) REFERENCES kpi(id)
 );
 CREATE TABLE "codes" (
