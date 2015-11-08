@@ -211,6 +211,9 @@ Inicializadores para la base de datos:
 
 Ejecutada esta secuencia se crea la base de datos requerida para
 que funcione la aplicación.
+
+
+
 PRAGMA foreign_keys = ON;
 
 CREATE TABLE "kpi" (
