@@ -19,6 +19,26 @@ o del mes. Hay muchas cosas que tengo que asumir y no tengo la información
 suficiente para asumir todo lo que se va a hacer.
 
 
+## Querys en sqlite basados en tiempo
+
+### Para obtener los datos de la semana
+Utilizando el siguiente query, obtnemos los datos de la semana en curso:
+
+```
+select * from history where strftime('%W',date) = strftime('%W','now');
+```
+
+Esta parte del query regresa la semana en la que estamos
+
+```
+select strftime('%W','now');
+```
+
+### Para obtener los targets del dia en curso
+
+```
+select target from targets where kpiid = 1 and day_of_week = strftime('%w','now');
+```
 
 */
 
@@ -26,7 +46,7 @@ $app = new Slim();
 
 $app->get('/', 'index' );
 $app->get('/update_outs', 'retrieve_from_osfm_and_put_in_sqlite' );
-$app->get('/init_tables', 'init_tables' );
+$app->get('/init_tables', 'confirmTableCreation' );
 
 
 function index()
@@ -37,32 +57,40 @@ function index()
 
 function retrieve_from_osfm_and_put_in_sqlite(){
     try {
-
-        $DB = new MxOptix();
+        $kpiid = 1;
+        $sqlite = new PDO('sqlite:piramide.sqlitedb');
+        $sqlite->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        // $DB = new MxOptix();
         // global $app;
         // $body = $app->request()->getBody();
         // $body = json_decode($body, true);
         // print_r($body);
-        $DB->setQuery("SELECT Count(job) qty FROM apps.xxbi_cyp_activity_log_v@osfm
-          WHERE
-          ORGANIZATION_CODE = 'F07'AND
-          item IN (
-          'RX-PMQPSK-100-B3',
-          'RX-PMQPSK-100-H1',
-          'RX-PMQPSK-100-JV2',
-          'RX-PMQPSK-40-D1')
+        $query = "SELECT Count(job) qty FROM apps.xxbi_cyp_activity_log_v@osfm
+          WHERE ORGANIZATION_CODE = 'F07'AND item IN ({codes})
           AND systemdate_est BETWEEN To_Date(To_Char(SYSDATE-2,'yyyymmdd')||'0730','yyyymmddhh24mi') AND
           To_Date(To_Char(SYSDATE-1,'yyyymmdd')||'0730','yyyymmddhh24mi')AND OPERATION_TYPE = 'DONE'
-        ");
-        $results = null;
-        oci_execute($DB->statement);
-        oci_fetch_all($DB->statement, $results,0,-1,OCI_FETCHSTATEMENT_BY_ROW);
-        print_r($results);
-        save_daily_outs($results);
-        $DB->close();
+        ";
+        $codesStatement = $sqlite->query("select code from codes where kpiid = " . $kpiid,PDO::FETCH_ASSOC);
+        $codes = array();
+        foreach ($codesStatement as $row) {
+          array_push($codes, $row['code']);
+        }
+        // print_r($codes);
+        // echo $codes;
+        $query = str_replace("{codes}", "'" . implode("','", $codes) . "'" , $query);
+
+        echo $query;
+        // $DB->setQuery($query);
+        // $results = null;
+        // oci_execute($DB->statement);
+        // oci_fetch_all($DB->statement, $results,0,-1,OCI_FETCHSTATEMENT_BY_ROW);
+        // print_r($results);
+        // save_daily_outs($results);
+        // $DB->close();
+        $sqlite->exec("insert into history ('kpiid', 'date', 'actual', 'target', 'is_holiday') values (1, date('now'), '25', '21', '0')");
     } catch (Exception $e) {
-        $DB->close();
-        echo ('Caught exception: '.  $e->getMessage(). "\n");
+        // $DB->close();
+        echo ('Caught exception: '.  print_r($e). "\n");
     }
 }
 
@@ -90,45 +118,6 @@ function save_daily_outs(){
   echo "</pre>";
 }
 
-function init_tables(){
-
-/*
-* Una tabla con las areas que se quieren estar monitoreando, el target
-* Los codigos de cada area
-* y otra con los datos por dia de los outs, y la meta actual.
-*/
-  $db = new PDO('sqlite:history.pyramid.sqlite');
-  $db->exec("drop table if exists areas");
-  $db->exec("CREATE TABLE Areas (
-    Id INTEGER PRIMARY KEY,
-    out_date DATETIME DEFAULT CURRENT_TIMESTAMP,
-    name TEXT,
-    target INTEGER);");
-  $db->exec("CREATE TABLE codigos (
-    Id INTEGER PRIMARY KEY,
-    out_date DATETIME DEFAULT CURRENT_TIMESTAMP,
-    name TEXT,
-    target INTEGER);");
-  $db->exec("CREATE TABLE outs (
-    Id INTEGER PRIMARY KEY,
-    out_date DATETIME DEFAULT CURRENT_TIMESTAMP,
-    name TEXT,
-    target INTEGER);");
-  $db->exec("INSERT INTO Dogs (Name, Age) VALUES ( 'Tank', 2);".
-             "INSERT INTO Dogs (Name, Age) VALUES ( 'Glacier', 7); " .
-             "INSERT INTO Dogs (Name, Age) VALUES ('Ellie', 4);");
-  $res = $db->query('SELECT * FROM Dogs');
-  // print_r($res);
-  echo "<pre>";
-  foreach($res as $row)
-  {
-    print $row['Id'].PHP_EOL;
-    print $row['out_date'].PHP_EOL;
-    print $row['Name'].PHP_EOL;
-    print $row['Age'].PHP_EOL;
-  }
-  echo "</pre>";
-}
 
 function sqlite3_example()
 {
@@ -202,6 +191,36 @@ $app->run();
 
 
 
+function init_tables(){
+
+/*
+* Una tabla con las areas que se quieren estar monitoreando, el target
+* Los codigos de cada area
+* y otra con los datos por dia de los outs, y la meta actual.
+*/
+  $db = new PDO('sqlite:history.pyramid.sqlite');
+  $db->exec("PRAGMA foreign_keys = ON");
+  $db->exec("drop table if exists areas");
+  $db->exec("drop table if exists codigos");
+  $db->exec("drop table if exists outs");
+  $db->exec("CREATE TABLE Areas (
+    Id INTEGER PRIMARY KEY,
+    out_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+    name TEXT,
+    target INTEGER);");
+  $db->exec("CREATE TABLE codigos (
+    Id INTEGER PRIMARY KEY,
+    out_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+    name TEXT,
+    target INTEGER);");
+  $db->exec("CREATE TABLE outs (
+    Id INTEGER PRIMARY KEY,
+    out_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+    name TEXT,
+    target INTEGER);");
+}
+
+
 
 
 
@@ -214,61 +233,68 @@ que funcione la aplicación.
 
 
 
+
+drop table if exists target_history;
+drop table if exists history;
+drop table if exists codes;
+drop table if exists targets;
+drop table if exists status;
+drop table if exists kpi;
 PRAGMA foreign_keys = ON;
 
-CREATE TABLE "kpi" (
-    "name" TEXT NOT NULL,
-    "color" TEXT NOT NULL DEFAULT ('#FFFFFF'),
-    "id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-    "Area" TEXT NOT NULL,
-    "type" text not null default ('OUTS'), 
-    "title_offset_x" TEXT DEFAULT ('0'),
-    "title_offset_y" TEXT DEFAULT ('0')
+CREATE TABLE 'kpi' (
+    'name' TEXT NOT NULL,
+    'color' TEXT NOT NULL DEFAULT ('#FFFFFF'),
+    'id' INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    'Area' TEXT NOT NULL,
+    'type' text not null default ('OUTS'), 
+    'title_offset_x' TEXT DEFAULT ('0'),
+    'title_offset_y' TEXT DEFAULT ('0')
 );
-CREATE TABLE "target_history" (
-    "kpiid" INTEGER NOT NULL,
-    "state" TEXT NOT NULL,
-    "user" TEXT NOT NULL,
-    "update_date" TEXT NOT NULL,
-    "day_of_week" TEXT NOT NULL,
-    "target" INTEGER NOT NULL DEFAULT (0),
+CREATE TABLE 'target_history' (
+    'kpiid' INTEGER NOT NULL,
+    'state' TEXT NOT NULL,
+    'user' TEXT NOT NULL,
+    'update_date' TEXT NOT NULL,
+    'day_of_week' TEXT NOT NULL,
+    'target' INTEGER NOT NULL DEFAULT (0),
     FOREIGN KEY(kpiid) REFERENCES kpi(id)
 );
-CREATE TABLE "history" (
-    "kpiid" INTEGER NOT NULL,
-    "date" TEXT NOT NULL,
-    "actual" INTEGER NOT NULL DEFAULT (0),
-    "target" INTEGER NOT NULL,
-    "is_hoiday" integer not null default (0),
+CREATE TABLE 'history' (
+    'kpiid' INTEGER NOT NULL,
+    'date' TEXT NOT NULL,
+    'actual' INTEGER NOT NULL DEFAULT (0),
+    'target' INTEGER NOT NULL,
+    'is_holiday' integer not null default (0),
     FOREIGN KEY(kpiid) REFERENCES kpi(id)
 );
-CREATE TABLE "codes" (
-    "kpiid" INTEGER NOT NULL,
-    "code" TEXT NOT NULL,
+CREATE TABLE 'codes' (
+    'kpiid' INTEGER NOT NULL,
+    'code' TEXT NOT NULL,
     FOREIGN KEY(kpiid) REFERENCES kpi(id) on update cascade on delete cascade
 );
-CREATE TABLE "targets" (
-    "kpiid" INTEGER NOT NULL,
-    "day_of_week" TEXT NOT NULL,
-    "last_update_user" TEXT NOT NULL,
-    "target" INTEGER NOT NULL DEFAULT (0),
+CREATE TABLE 'targets' (
+    'kpiid' INTEGER NOT NULL,
+    'day_of_week' TEXT NOT NULL,
+    'last_update_user' TEXT NOT NULL,
+    'target' INTEGER NOT NULL DEFAULT (0),
     FOREIGN KEY(kpiid) REFERENCES kpi(id)  on update cascade on delete cascade
 );
 CREATE TABLE status (
-    "kpiid" TEXT NOT NULL,
-    "qty" INTEGER NOT NULL DEFAULT (0),
-    "datetime" TEXT NOT NULL,
+    'kpiid' TEXT NOT NULL,
+    'qty' INTEGER NOT NULL DEFAULT (0),
+    'datetime' TEXT NOT NULL,
     FOREIGN KEY(kpiid) REFERENCES kpi(id) on update cascade on delete cascade
 );
 
-CREATE INDEX "codes_kpiid" on codes (kpiid ASC);
-CREATE INDEX "history_kpiid" on history (kpiid ASC);
-CREATE INDEX "kpi_id" on kpi (id ASC);
-CREATE INDEX "target_h_kpiid" on target_history (kpiid ASC);
-CREATE INDEX "target_h_state" on target_history (state ASC);
-CREATE INDEX "target_h_id_day_of_week" on target_history (kpiid ASC, day_of_week ASC);
-CREATE INDEX "history_id_date" on history (kpiid ASC, date ASC);
-CREATE INDEX "targets_id" on targets (kpiid ASC);
+CREATE INDEX 'codes_kpiid' on codes (kpiid ASC);
+CREATE INDEX 'history_kpiid' on history (kpiid ASC);
+CREATE INDEX 'kpi_id' on kpi (id ASC);
+CREATE INDEX 'target_h_kpiid' on target_history (kpiid ASC);
+CREATE INDEX 'target_h_state' on target_history (state ASC);
+CREATE INDEX 'target_h_id_day_of_week' on target_history (kpiid ASC, day_of_week ASC);
+CREATE INDEX 'history_id_date' on history (kpiid ASC, date ASC);
+CREATE INDEX 'targets_id' on targets (kpiid ASC);
 CREATE TRIGGER 'Init_Target'
    AFTER INSERT ON kpi
 BEGIN
@@ -289,13 +315,44 @@ BEGIN
     where kpiid = new.kpiid;
     insert into target_history
     (kpiid, state, user, update_date, day_of_week, target)
-	select new.kpiid, 'C', 'user', datetime('now'),new.day_of_week, new.target;
+  select new.kpiid, 'C', 'user', datetime('now'),new.day_of_week, new.target;
 END;
 CREATE TRIGGER 'i_keep_history'
    AFTER insert ON targets
 BEGIN
     insert into target_history
     (kpiid, state, user, update_date, day_of_week, target)
-	select new.kpiid, 'C', 'user', datetime('now'),new.day_of_week, new.target;
+  select new.kpiid, 'C', 'user', datetime('now'),new.day_of_week, new.target;
 END;
+
+
+
+BEGIN TRANSACTION;
+insert into kpi ('name', 'color', 'id', 'Area', 'title_offset_x', 'title_offset_y') values ('OUTS', '#FFFFFF', '1', 'PMQPSK', '0', '0');
+
+insert into codes ('kpiid', 'code') values ('1', 'RX-PMQPSK-100-B3');
+insert into codes ('kpiid', 'code') values ('1', 'RX-PMQPSK-100-H1');
+insert into codes ('kpiid', 'code') values ('1', 'RX-PMQPSK-100-JV2');
+insert into codes ('kpiid', 'code') values ('1', 'RX-PMQPSK-40-D1');
+
+
+insert into history ("kpiid", "date", "actual", "target", "is_holiday") values ('1', date('now','-1 days'), '20', '21', '0');
+insert into history ("kpiid", "date", "actual", "target", "is_holiday") values ('1', date('now','-2 days'), '20', '21', '0');
+insert into history ("kpiid", "date", "actual", "target", "is_holiday") values ('1', date('now','-3 days'), '20', '21', '0');
+insert into history ("kpiid", "date", "actual", "target", "is_holiday") values ('1', date('now','-4 days'), '20', '21', '0');
+insert into history ("kpiid", "date", "actual", "target", "is_holiday") values ('1', date('now','-5 days'), '20', '21', '0');
+insert into history ("kpiid", "date", "actual", "target", "is_holiday") values ('1', date('now','-6 days'), '20', '21', '0');
+insert into history ("kpiid", "date", "actual", "target", "is_holiday") values ('1', date('now','-7 days'), '20', '21', '0');
+insert into history ("kpiid", "date", "actual", "target", "is_holiday") values ('1', date('now','-8 days'), '20', '21', '0');
+insert into history ("kpiid", "date", "actual", "target", "is_holiday") values ('1', date('now','-9 days'), '20', '21', '0');
+insert into history ("kpiid", "date", "actual", "target", "is_holiday") values ('1', date('now','-10 days'), '20', '21', '0');
+insert into history ("kpiid", "date", "actual", "target", "is_holiday") values ('1', date('now','-11 days'), '20', '21', '0');
+insert into history ("kpiid", "date", "actual", "target", "is_holiday") values ('1', date('now','-12 days'), '20', '21', '0');
+insert into history ("kpiid", "date", "actual", "target", "is_holiday") values ('1', date('now','-13 days'), '20', '21', '0');
+insert into history ("kpiid", "date", "actual", "target", "is_holiday") values ('1', date('now','-14 days'), '20', '21', '0');
+insert into history ("kpiid", "date", "actual", "target", "is_holiday") values ('1', date('now','-16 days'), '20', '21', '0');
+insert into history ("kpiid", "date", "actual", "target", "is_holiday") values ('1', date('now','-17 days'), '20', '21', '0');
+insert into history ("kpiid", "date", "actual", "target", "is_holiday") values ('1', date('now','-18 days'), '20', '21', '0');
+COMMIT;
+
 */
