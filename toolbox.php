@@ -40,12 +40,30 @@ select strftime('%W','now');
 select target from targets where kpiid = 1 and day_of_week = strftime('%w','now');
 ```
 
+
+### Para obtener el historial del mes
+
+```
+select * from history where strftime('%Y%m',date) = strftime('%Y%m','now');
+```
+
+para el mes pasado:
+
+```
+select * from history where strftime('%Y%m',date) = strftime('%Y%m','now','-1 month');
+```
+
+En esta parte creo que es importante que el formato de la fecha incluya el año, para que
+no me valla a tomar datos de años pasados que correspondan al mismo mes
 */
 
-$app = new Slim();
+date_default_timezone_set('America/Matamoros');
 
+$app = new Slim();
+$app->sqlite = new PDO('sqlite:piramide.sqlitedb');
+$app->sqlite->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 $app->get('/', 'index' );
-$app->get('/update_outs', 'retrieve_from_osfm_and_put_in_sqlite' );
+$app->get('/update_outs/:kpiid', 'retrieve_from_osfm_and_put_in_sqlite' );
 $app->get('/init_tables', 'confirmTableCreation' );
 
 
@@ -55,67 +73,66 @@ function index()
 }
 
 
-function retrieve_from_osfm_and_put_in_sqlite(){
-    try {
-        $kpiid = 1;
-        $sqlite = new PDO('sqlite:piramide.sqlitedb');
-        $sqlite->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-        // $DB = new MxOptix();
-        // global $app;
-        // $body = $app->request()->getBody();
-        // $body = json_decode($body, true);
-        // print_r($body);
-        $query = "SELECT Count(job) qty FROM apps.xxbi_cyp_activity_log_v@osfm
-          WHERE ORGANIZATION_CODE = 'F07'AND item IN ({codes})
-          AND systemdate_est BETWEEN To_Date(To_Char(SYSDATE-2,'yyyymmdd')||'0730','yyyymmddhh24mi') AND
-          To_Date(To_Char(SYSDATE-1,'yyyymmdd')||'0730','yyyymmddhh24mi')AND OPERATION_TYPE = 'DONE'
-        ";
-        $codesStatement = $sqlite->query("select code from codes where kpiid = " . $kpiid,PDO::FETCH_ASSOC);
-        $codes = array();
-        foreach ($codesStatement as $row) {
-          array_push($codes, $row['code']);
-        }
-        // print_r($codes);
-        // echo $codes;
-        $query = str_replace("{codes}", "'" . implode("','", $codes) . "'" , $query);
-
-        echo $query;
-        // $DB->setQuery($query);
-        // $results = null;
-        // oci_execute($DB->statement);
-        // oci_fetch_all($DB->statement, $results,0,-1,OCI_FETCHSTATEMENT_BY_ROW);
-        // print_r($results);
-        // save_daily_outs($results);
-        // $DB->close();
-        $sqlite->exec("insert into history ('kpiid', 'date', 'actual', 'target', 'is_holiday') values (1, date('now'), '25', '21', '0')");
-    } catch (Exception $e) {
-        // $DB->close();
-        echo ('Caught exception: '.  print_r($e). "\n");
-    }
+function retrieve_from_osfm_and_put_in_sqlite($kpiid){
+  global $app;
+  try {
+      $date = 'now';
+      save_daily_outs($kpiid, $date, getDataFromOSFM($kpiid), getDaylyTarget($kpiid));
+  } catch (Exception $e) {
+    echo ('Caught exception: \n'.  print_r($e). "\n");
+  }
 }
 
-function save_daily_outs(){
-  $db = new PDO('sqlite:history.pyramid.sqlite');
-  $db->exec("drop table if exists dogs");
-  $db->exec("CREATE TABLE Dogs (
-    Id INTEGER PRIMARY KEY,
-    out_date DATETIME DEFAULT CURRENT_TIMESTAMP,
-    Name TEXT,
-    Age INTEGER)");
-  $db->exec("INSERT INTO Dogs (Name, Age) VALUES ( 'Tank', 2);".
-             "INSERT INTO Dogs (Name, Age) VALUES ( 'Glacier', 7); " .
-             "INSERT INTO Dogs (Name, Age) VALUES ('Ellie', 4);");
-  $res = $db->query('SELECT * FROM Dogs');
-  // print_r($res);
-  echo "<pre>";
-  foreach($res as $row)
-  {
-    print $row['Id'].PHP_EOL;
-    print $row['out_date'].PHP_EOL;
-    print $row['Name'].PHP_EOL;
-    print $row['Age'].PHP_EOL;
+function getDataFromOSFM($kpiid)
+{
+  // return '20';
+  try {
+    $results = null;
+    $DB = new MxOptix();
+    $query = "SELECT Count(job) qty FROM apps.xxbi_cyp_activity_log_v@osfm
+    WHERE ORGANIZATION_CODE = 'F07'AND item IN ({codes})
+    AND systemdate_est BETWEEN To_Date(To_Char(SYSDATE-2,'yyyymmdd')||'0730','yyyymmddhh24mi') AND
+    To_Date(To_Char(SYSDATE-1,'yyyymmdd')||'0730','yyyymmddhh24mi')AND OPERATION_TYPE = 'DONE'
+    ";
+    $query = str_replace("{codes}", getCodes($kpiid) , $query);
+    $DB->setQuery($query);
+    oci_execute($DB->statement);
+    oci_fetch_all($DB->statement, $results,0,-1,OCI_FETCHSTATEMENT_BY_ROW);
+    $DB->close();
+    return $results[0]['QTY'];
+  } catch (Exception $e) {
+    $DB->close();
+    echo ('Caught exception: \n'.  print_r($e). "\n");
   }
-  echo "</pre>";
+}
+
+function flat_array($array)
+{
+  return "'" . implode("','", $array) . "'";
+}
+
+function getCodes($kpiid)
+{
+  global $app;
+  $stmt = $app->sqlite->query("select code from codes where kpiid = " . $kpiid);
+  $codes = array();
+  foreach ($stmt as $row) {
+    array_push($codes, $row['code']);
+  }
+  return flat_array($codes);
+}
+
+function getDaylyTarget($kpiid)
+{
+  global $app;
+  $stmt = $app->sqlite->query("select target from targets where kpiid = " . $kpiid . " and day_of_week = strftime('%w','now')");
+  $ansArray = $stmt->fetchAll(PDO::FETCH_ASSOC);
+  return $ansArray[0]['target'];
+}
+
+function save_daily_outs($kpiid, $date = 'now', $actual, $target){
+  global $app;
+  $app->sqlite->exec("insert into history ('kpiid', 'date', 'actual', 'target') values (" . $kpiid . ", date('" . $date . "'), '" . $actual . "', '" . $target . "')");
 }
 
 
@@ -312,7 +329,7 @@ CREATE TRIGGER 'keep_history'
    AFTER UPDATE ON targets
 BEGIN
     update target_history set state = 'O'
-    where kpiid = new.kpiid;
+    where kpiid = new.kpiid and day_of_week = new.day_of_week;
     insert into target_history
     (kpiid, state, user, update_date, day_of_week, target)
   select new.kpiid, 'C', 'user', datetime('now'),new.day_of_week, new.target;
@@ -328,7 +345,9 @@ END;
 
 
 BEGIN TRANSACTION;
-insert into kpi ('name', 'color', 'id', 'Area', 'title_offset_x', 'title_offset_y') values ('OUTS', '#FFFFFF', '1', 'PMQPSK', '0', '0');
+insert into kpi ("name", "color", "id", "Area", "type", "title_offset_x", "title_offset_y") values ('OUTS', '#FFFFFF', '1', 'PMQPSK', 'OUTS', '0', '0');
+insert into kpi ("name", "color", "id", "Area", "type", "title_offset_x", "title_offset_y") values ('OUTS', '#FFFF00', '2', 'µITLA', 'OUTS', '0', '0');
+
 
 insert into codes ('kpiid', 'code') values ('1', 'RX-PMQPSK-100-B3');
 insert into codes ('kpiid', 'code') values ('1', 'RX-PMQPSK-100-H1');
@@ -353,6 +372,26 @@ insert into history ("kpiid", "date", "actual", "target", "is_holiday") values (
 insert into history ("kpiid", "date", "actual", "target", "is_holiday") values ('1', date('now','-16 days'), '20', '21', '0');
 insert into history ("kpiid", "date", "actual", "target", "is_holiday") values ('1', date('now','-17 days'), '20', '21', '0');
 insert into history ("kpiid", "date", "actual", "target", "is_holiday") values ('1', date('now','-18 days'), '20', '21', '0');
+insert into history ("kpiid", "date", "actual", "target", "is_holiday") values ('1', date('now','-19 days'), '20', '21', '0');
+insert into history ("kpiid", "date", "actual", "target", "is_holiday") values ('1', date('now','-21 days'), '20', '21', '0');
+insert into history ("kpiid", "date", "actual", "target", "is_holiday") values ('1', date('now','-22 days'), '20', '21', '0');
+insert into history ("kpiid", "date", "actual", "target", "is_holiday") values ('1', date('now','-23 days'), '20', '21', '0');
+insert into history ("kpiid", "date", "actual", "target", "is_holiday") values ('1', date('now','-24 days'), '20', '21', '0');
+insert into history ("kpiid", "date", "actual", "target", "is_holiday") values ('1', date('now','-25 days'), '20', '21', '0');
+insert into history ("kpiid", "date", "actual", "target", "is_holiday") values ('1', date('now','-26 days'), '20', '21', '0');
+insert into history ("kpiid", "date", "actual", "target", "is_holiday") values ('1', date('now','-27 days'), '20', '21', '0');
+insert into history ("kpiid", "date", "actual", "target", "is_holiday") values ('1', date('now','-28 days'), '20', '21', '0');
+insert into history ("kpiid", "date", "actual", "target", "is_holiday") values ('1', date('now','-29 days'), '20', '21', '0');
+insert into history ("kpiid", "date", "actual", "target", "is_holiday") values ('1', date('now','-30 days'), '20', '21', '0');
+insert into history ("kpiid", "date", "actual", "target", "is_holiday") values ('1', date('now','-32 days'), '20', '21', '0');
+insert into history ("kpiid", "date", "actual", "target", "is_holiday") values ('1', date('now','-33 days'), '20', '21', '0');
+insert into history ("kpiid", "date", "actual", "target", "is_holiday") values ('1', date('now','-34 days'), '20', '21', '0');
+insert into history ("kpiid", "date", "actual", "target", "is_holiday") values ('1', date('now','-35 days'), '20', '21', '0');
+insert into history ("kpiid", "date", "actual", "target", "is_holiday") values ('1', date('now','-36 days'), '20', '21', '0');
+insert into history ("kpiid", "date", "actual", "target", "is_holiday") values ('1', date('now','-37 days'), '20', '21', '0');
+insert into history ("kpiid", "date", "actual", "target", "is_holiday") values ('1', date('now','-38 days'), '20', '21', '0');
+insert into history ("kpiid", "date", "actual", "target", "is_holiday") values ('1', date('now','-39 days'), '20', '21', '0');
+insert into history ("kpiid", "date", "actual", "target", "is_holiday") values ('1', date('now','-40 days'), '20', '21', '0');
 COMMIT;
 
 */
