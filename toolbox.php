@@ -62,8 +62,14 @@ date_default_timezone_set('America/Matamoros');
 $app = new Slim();
 $app->sqlite = new PDO('sqlite:piramide.sqlitedb');
 $app->sqlite->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+
+
+
+
 $app->get('/', 'index' );
 $app->get('/update_outs/:kpiid', 'retrieve_from_osfm_and_put_in_sqlite' );
+$app->get('/piramid/:kpiid', 'build_and_return_piramid_data');
+$app->get('/list','list_available_piramids_data');
 $app->get('/init_tables', 'confirmTableCreation' );
 
 
@@ -135,6 +141,33 @@ function save_daily_outs($kpiid, $date = 'now', $actual, $target){
   $app->sqlite->exec("insert into history ('kpiid', 'date', 'actual', 'target') values (" . $kpiid . ", date('" . $date . "'), '" . $actual . "', '" . $target . "')");
 }
 
+function list_available_piramids_data()
+{
+  global $app;
+  try {
+    $res = $app->sqlite->query('select * from kpi')->fetchAll(PDO::FETCH_ASSOC);
+    echo(json_encode($res));
+  } catch (Exception $e) {
+    echo $e->message;
+  }
+}
+
+function build_and_return_piramid_data($kpiid)
+{
+  echo "<pre>";
+  global $app;
+  try {
+    $ans = array();
+    $ans['kpi_info'] = $app->sqlite->query('select * from kpi where id =' . $kpiid)->fetchAll(PDO::FETCH_ASSOC);
+    $ans['target_day'] = $app->sqlite->query('select target from targets where kpiid = '. $kpiid ." and day_of_week = strftime('%w','now')")->fetchAll(PDO::FETCH_ASSOC)[0]['target'];
+    $ans['target_day'] = $app->sqlite->query('select target from targets where kpiid = '. $kpiid ." and day_of_week = strftime('%w','now')")->fetchAll(PDO::FETCH_ASSOC)[0]['target'];
+    $ans['history'] = $app->sqlite->query("select * from history where strftime('%Y%m',date) = strftime('%Y%m','now') and kpiid = " . $kpiid )->fetchAll(PDO::FETCH_ASSOC);
+    print_r($ans);
+  } catch (Exception $e) {
+    
+  }
+  echo "</pre>";
+}
 
 function sqlite3_example()
 {
@@ -263,7 +296,7 @@ CREATE TABLE 'kpi' (
     'name' TEXT NOT NULL,
     'color' TEXT NOT NULL DEFAULT ('#FFFFFF'),
     'id' INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-    'Area' TEXT NOT NULL,
+    'area' TEXT NOT NULL,
     'type' text not null default ('OUTS'), 
     'title_offset_x' TEXT DEFAULT ('0'),
     'title_offset_y' TEXT DEFAULT ('0')

@@ -1,10 +1,32 @@
 var coff = require('./coff.coffee');
-var $ = require('jquery');
+var fetch = require('fetch').fetchUrl;
 var kpiData = $.get('./toolbox.php/getStatistics/' + kpiName);
 
 kpiData.done( function(data){
     console.log(data);
 });
+
+
+/*
+Se tiene que hacer un servicio que regrese los siguientes datos
+
+piramide:[
+    {
+        actual:100,
+        target:50
+    }
+    ...
+],
+week:[
+    {
+        wkNumber:'1'
+        target:1000,
+        actual:500
+    }
+]
+
+*/
+
 
 var select = function (selector) {return document.getElementById(selector);}
 
